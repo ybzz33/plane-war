@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>æ¤ç´æºæ¾¶Ñå¬</title>
+<title>飞机大战</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #000; touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
@@ -71,15 +71,15 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
 <body>
 <canvas id="game"></canvas>
 <div id="ui-layer">
-  <div class="ui-panel ui-score">å¯°æ¥å <span id="score">0</span></div>
+  <div class="ui-panel ui-score">得分 <span id="score">0</span></div>
   <div class="ui-panel ui-hp" id="hp-panel"></div>
 </div>
 <div id="powerup-bar"></div>
 <div id="charge-indicator"><div id="charge-fill"></div></div>
 <div id="game-over">
-  <h2>å¨ååç¼æ´æ½«</h2>
-  <div class="final-score">éâ¬ç¼å ç·±é?<b id="final-score">0</b></div>
-  <button id="restart-btn">é²å¶æå¯®â¬æ¿®?/button>
+  <h2>游戏结束</h2>
+  <div class="final-score">最终得分 <b id="final-score">0</b></div>
+  <button id="restart-btn">重新开始</button>
 </div>
 <script>
 (function() {
@@ -103,16 +103,17 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
   let charging, chargeLevel;
   let animId;
 
-  // é¬æ³å¿éèµâ¬?  let activePowerups = {}; // { type: { remaining, ... } }
+  // 道具状态
+  let activePowerups = {}; // { type: { remaining, ... } }
   const POWERUP_TYPES = {
-    scatter:  { name: 'éï½ç å¯®å½äº¾', icon: 'é¦ç', color: '#ffd700', duration: 10 },
-    laser:    { name: 'éå«å§å©µâ¬é?, icon: 'é¦æ¸', color: '#00bfff', duration: 8 },
-    reflect:  { name: 'çæî¾éå¶ç ', icon: 'é¦ç', color: '#cc44ff', duration: 8 },
-    heal:     { name: 'é¢ç·æ¡é­ã î²', icon: 'é¦ç', color: '#44ff44', duration: 0 },
-    rapid:    { name: 'éç»â¬ç·ç é?, icon: 'é¿?, color: '#ff8800', duration: 10 }
+    scatter:  { name: '散射弹道', icon: '🟡', color: '#ffd700', duration: 10 },
+    laser:    { name: '蓄力激光', icon: '🔵', color: '#00bfff', duration: 8 },
+    reflect:  { name: '贴墙反射', icon: '🟣', color: '#cc44ff', duration: 8 },
+    heal:     { name: '生命恢复', icon: '🟢', color: '#44ff44', duration: 0 },
+    rapid:    { name: '加速射击', icon: '⚡', color: '#ff8800', duration: 10 }
   };
 
-  // é¹â¬é¹â¬ éè«æ¥ç»¯è¤ç²º é¹â¬é¹â¬
+  // ── 音效系统 ──
   let audioCtx = null;
   function getAudioCtx() {
     if (!audioCtx) {
@@ -201,7 +202,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     playTone(300 + Math.random() * 200, 0.05, 'sine', 0.03, 600);
   }
 
-  // é¹â¬é¹â¬ éçºâé³å±¾æ« é¹â¬é¹â¬
+  // ── 星空背景 ──
   function initStars(count) {
     const arr = [];
     for (let i = 0; i < count; i++) {
@@ -235,11 +236,11 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     }
   }
 
-  // é¹â¬é¹â¬ éâîæ¤ç´æºç¼æ¨ºå é¹â¬é¹â¬
+  // ── 玩家飞机绘制 ──
   function drawPlayer(x, y, w, h) {
     ctx.save();
     ctx.translate(x, y);
-    // å¯®ææ¸éî¤å
+    // 引擎火焰
     const flameLen = 10 + Math.random() * 8;
     const grd = ctx.createLinearGradient(0, h * 0.35, 0, h * 0.35 + flameLen);
     grd.addColorStop(0, '#ffaa00');
@@ -251,7 +252,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     ctx.lineTo(0, h * 0.35 + flameLen);
     ctx.lineTo(w * 0.18, h * 0.35);
     ctx.fill();
-    // éé¸¿é©
+    // 机身
     ctx.fillStyle = '#4da6ff';
     ctx.beginPath();
     ctx.moveTo(0, -h * 0.42);
@@ -263,7 +264,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     ctx.lineTo(-w * 0.25, -h * 0.15);
     ctx.closePath();
     ctx.fill();
-    // éè¹è
+    // 机翼
     ctx.fillStyle = '#3388dd';
     ctx.beginPath();
     ctx.moveTo(-w * 0.25, -h * 0.08);
@@ -277,17 +278,18 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     ctx.lineTo(w * 0.28, h * 0.22);
     ctx.closePath();
     ctx.fill();
-    // æ¤¹é¹âé¸?    ctx.fillStyle = '#80d4ff';
+    // 驾驶舱
+    ctx.fillStyle = '#80d4ff';
     ctx.beginPath();
     ctx.ellipse(0, -h * 0.06, w * 0.13, h * 0.18, 0, 0, Math.PI * 2);
     ctx.fill();
-    // æ¥æ¨ºå
+    // 高光
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.beginPath();
     ctx.ellipse(-w * 0.04, -h * 0.12, w * 0.05, h * 0.08, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // é¬æ³å¿éå¤å¹
+    // 道具光环
     if (activePowerups.scatter) {
       ctx.strokeStyle = '#ffd700';
       ctx.lineWidth = 2;
@@ -318,7 +320,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     ctx.restore();
   }
 
-  // é¹â¬é¹â¬ éå±¾æºç¼æ¨ºå é¹â¬é¹â¬
+  // ── 敌机绘制 ──
   function drawEnemy(x, y, w, h) {
     ctx.save();
     ctx.translate(x, y);
@@ -353,7 +355,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     ctx.restore();
   }
 
-  // é¹â¬é¹â¬ çæ¬èç¼æ¨ºå é¹â¬é¹â¬
+  // ── 子弹绘制 ──
   function drawBullet(x, y, w, h, color) {
     const c = color || '#ffd700';
     const grd = ctx.createLinearGradient(x, y - h, x, y);
@@ -369,12 +371,12 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     ctx.fill();
   }
 
-  // é¹â¬é¹â¬ é¬æ³å¿ç¼æ¨ºå é¹â¬é¹â¬
+  // ── 道具绘制 ──
   function drawPowerup(p) {
     ctx.save();
     ctx.translate(p.x, p.y);
     const r = p.r || 13;
-    // éå¤æª¿
+    // 光晕
     const glow = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 1.3);
     glow.addColorStop(0, p.glowColor);
     glow.addColorStop(1, 'rgba(0,0,0,0)');
@@ -382,7 +384,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     ctx.beginPath();
     ctx.arc(0, 0, r * 1.3, 0, Math.PI * 2);
     ctx.fill();
-    // æ¶è®³ç¶
+    // 主体
     ctx.fillStyle = p.color;
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -390,7 +392,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     ctx.strokeStyle = 'rgba(255,255,255,0.6)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    // éå§ç§
+    // 文字
     ctx.fillStyle = '#000';
     ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'center';
@@ -399,7 +401,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     ctx.restore();
   }
 
-  // é¹â¬é¹â¬ å©µâ¬éå¤æ½«ç¼æ¨ºå é¹â¬é¹â¬
+  // ── 激光束绘制 ──
   function drawLaser(x, y, w, len) {
     const grd = ctx.createLinearGradient(x, y - len, x, y);
     grd.addColorStop(0, 'rgba(0,191,255,0)');
@@ -409,12 +411,12 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     grd.addColorStop(1, 'rgba(0,191,255,0)');
     ctx.fillStyle = grd;
     ctx.fillRect(x - w / 2, y - len, w, len);
-    // æ¶îç¸¾é§çå
+    // 中心白线
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.fillRect(x - w / 6, y - len, w / 3, len);
   }
 
-  // é¹â¬é¹â¬ éåå¢ç»®æç é¹â¬é¹â¬
+  // ── 爆炸粒子 ──
   function spawnParticles(x, y, color, count) {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -427,7 +429,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     }
   }
 
-  // é¹â¬é¹â¬ çº°çæå¦«â¬å¨´?é¹â¬é¹â¬
+  // ── 碰撞检测 ──
   function rectCollide(a, b) {
     return (
       a.x - a.w / 2 < b.x + b.w / 2 &&
@@ -444,7 +446,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     return dist < (a.r || a.w / 2) + (b.r || b.w / 2);
   }
 
-  // é¹â¬é¹â¬ å©µâ¬å¨²å©äº¾é?é¹â¬é¹â¬
+  // ── 激活道具 ──
   function activatePowerup(type) {
     const pt = POWERUP_TYPES[type];
     if (!pt) return;
@@ -455,12 +457,13 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       return;
     }
 
-    // æ¿¡åçå®¸è¬ç²¡å©µâ¬å¨²ä¼ç´ééæéå æ£¿
+    // 如果已经激活，刷新时间
     activePowerups[type] = { remaining: pt.duration, total: pt.duration };
     updatePowerupBar();
 
     if (type === 'laser') {
-      // éæ¿îéæ ¬æ«éæ¶å§¸é¬?      charging = false;
+      // 初始化蓄力状态
+      charging = false;
       chargeLevel = 0;
     }
   }
@@ -478,9 +481,9 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     powerupBar.innerHTML = html;
   }
 
-  // é¹â¬é¹â¬ é¢ç¸åé¬æ³å¿ é¹â¬é¹â¬
+  // ── 生成道具 ──
   function spawnPowerup(x, y) {
-    if (Math.random() > 0.35) return; // 35% éºå¤æ¤å§åå·¼
+    if (Math.random() > 0.35) return; // 35% 掉落概率
 
     const types = ['scatter', 'laser', 'reflect', 'heal', 'rapid'];
     const weights = [25, 20, 25, 15, 15];
@@ -504,7 +507,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     });
   }
 
-  // é¹â¬é¹â¬ éæ¿îé?/ é²å¶ç é¹â¬é¹â¬
+  // ── 初始化 / 重置 ──
   function reset() {
     resize();
     player = { x: W / 2, y: H * 0.78, w: 40, h: 48 };
@@ -554,13 +557,13 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     chargeIndicator.style.display = 'none';
   }
 
-  // é¹â¬é¹â¬ æ¶ç»ç¶é´å¿æé?é¹â¬é¹â¬
+  // ── 主游戏循环 ──
   function gameLoop(ts) {
     if (!gameRunning) { animId = requestAnimationFrame(gameLoop); return; }
 
     const dt = 16.67;
 
-    // éå­æé¬æ³å¿çâæ¤
+    // 更新道具计时
     for (const type of Object.keys(activePowerups)) {
       activePowerups[type].remaining -= dt / 1000;
       if (activePowerups[type].remaining <= 0) {
@@ -574,7 +577,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     }
     updatePowerupBar();
 
-    // é·îå§©çå«å®
+    // 自动射击
     const curInterval = activePowerups.rapid ? bulletInterval / 2 : bulletInterval;
     bulletTimer += dt;
     if (bulletTimer >= curInterval) {
@@ -582,7 +585,8 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       playShootSound();
 
       if (activePowerups.scatter) {
-        // 3éææå¯®?        bullets.push({ x: player.x, y: player.y - player.h / 2, w: 4, h: 14, vx: -2.5, vy: -8 });
+        // 3发散弹
+        bullets.push({ x: player.x, y: player.y - player.h / 2, w: 4, h: 14, vx: -2.5, vy: -8 });
         bullets.push({ x: player.x, y: player.y - player.h / 2, w: 4, h: 14, vx: 0, vy: -8 });
         bullets.push({ x: player.x, y: player.y - player.h / 2, w: 4, h: 14, vx: 2.5, vy: -8 });
       } else {
@@ -590,12 +594,13 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       }
     }
 
-    // éå«å§é«æç·«éå ç¸ºéå¤ç¸ºå¨²ç»æ¤é?    if (activePowerups.laser && touchActive) {
+    // 蓄力逻辑（激光激活时）
+    if (activePowerups.laser && touchActive) {
       const dx = touchX - touchStartX;
       const dy = touchY - touchStartY;
       const moved = Math.sqrt(dx * dx + dy * dy);
       if (moved < 15) {
-        // éµå¬«å¯å¨â³ãéªå¯Ð©éîç´éå«å§
+        // 手指没大幅移动，蓄力
         if (!charging) {
           charging = true;
           chargeLevel = 0;
@@ -607,17 +612,18 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
           playChargeTickSound();
         }
       } else {
-        // éµå¬«å¯ç»è¯²å§©æµå­ç´éæ ¨ç§·éå«å§
+        // 手指移动了，取消蓄力
         charging = false;
         chargeLevel = 0;
         chargeIndicator.style.display = 'none';
         chargeFill.style.width = '0%';
       }
-      // éå­æ touchStart æµ£å¶çé¬å®å¤ç»±îÐ
+      // 更新 touchStart 位置避免累积
       touchStartX = touchX;
       touchStartY = touchY;
     } else if (!touchActive && charging) {
-      // éç¬å¢é²å©æå©µâ¬é?      if (chargeLevel > 0.15) {
+      // 松手释放激光
+      if (chargeLevel > 0.15) {
         const laserW = 10 + chargeLevel * 25;
         lasers.push({
           x: player.x, y: player.y - player.h / 2,
@@ -633,7 +639,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       chargeFill.style.width = '0%';
     }
 
-    // éå±¾æºé¢ç¸å
+    // 敌机生成
     enemyTimer += dt;
     if (enemyTimer >= enemyInterval) {
       enemyTimer = 0;
@@ -643,15 +649,15 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       enemyInterval = Math.max(400, enemyInterval - 3);
     }
 
-    // éå­æéç¸æ§¦
+    // 更新星星
     updateStars();
 
-    // éå­æçæ¬è
+    // 更新子弹
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
       b.x += (b.vx || 0);
       b.y += (b.vy || -8);
-      // çæî¾éå¶ç 
+      // 贴墙反射
       if (activePowerups.reflect) {
         if (b.x - b.w / 2 <= 0) { b.vx = Math.abs(b.vx); b.x = b.w / 2; }
         if (b.x + b.w / 2 >= W) { b.vx = -Math.abs(b.vx); b.x = W - b.w / 2; }
@@ -662,24 +668,25 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       }
     }
 
-    // éå­æéå±¾æº
+    // 更新敌机
     for (let i = enemies.length - 1; i >= 0; i--) {
       enemies[i].y += enemies[i].speed;
       if (enemies[i].y > H + 50) enemies.splice(i, 1);
     }
 
-    // éå­æé¬æ³å¿
+    // 更新道具
     for (let i = powerups.length - 1; i >= 0; i--) {
       powerups[i].y += powerups[i].vy;
       if (powerups[i].y > H + 30) powerups.splice(i, 1);
     }
 
-    // éå­æå©µâ¬é?    for (let i = lasers.length - 1; i >= 0; i--) {
+    // 更新激光
+    for (let i = lasers.length - 1; i >= 0; i--) {
       lasers[i].life -= dt / 1000;
       if (lasers[i].life <= 0) lasers.splice(i, 1);
     }
 
-    // çæ¬è vs éå±¾æº
+    // 子弹 vs 敌机
     for (let b = bullets.length - 1; b >= 0; b--) {
       let bulletHit = false;
       for (let e = enemies.length - 1; e >= 0; e--) {
@@ -698,7 +705,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       if (bulletHit) { bullets.splice(b, 1); }
     }
 
-    // å©µâ¬é?vs éå±¾æº
+    // 激光 vs 敌机
     for (const laser of lasers) {
       for (let e = enemies.length - 1; e >= 0; e--) {
         const en = enemies[e];
@@ -713,7 +720,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       }
     }
 
-    // éå±¾æº vs éâî
+    // 敌机 vs 玩家
     for (let e = enemies.length - 1; e >= 0; e--) {
       if (rectCollide(player, enemies[e])) {
         spawnParticles(enemies[e].x, enemies[e].y, '#ff4757', 18);
@@ -727,7 +734,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       }
     }
 
-    // éâî vs é¬æ³å¿
+    // 玩家 vs 道具
     for (let p = powerups.length - 1; p >= 0; p--) {
       if (circleCollide(player, powerups[p])) {
         playPickupSound();
@@ -736,17 +743,17 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       }
     }
 
-    // éå­æç»®æç
+    // 更新粒子
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.x += p.vx; p.y += p.vy; p.life -= p.decay;
       if (p.life <= 0) particles.splice(i, 1);
     }
 
-    // éå§ççæ¿åº
+    // 震屏衰减
     if (shakeAmount > 0.05) shakeAmount *= shakeDecay; else shakeAmount = 0;
 
-    // é¹â¬é¹â¬ å¨åç é¹â¬é¹â¬
+    // ── 渲染 ──
     ctx.clearRect(0, 0, W, H);
     const sx = shakeAmount > 0 ? (Math.random() - 0.5) * shakeAmount * 2 : 0;
     const sy = shakeAmount > 0 ? (Math.random() - 0.5) * shakeAmount * 2 : 0;
@@ -756,7 +763,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
 
     drawStars();
 
-    // ç»®æç
+    // 粒子
     for (const p of particles) {
       ctx.globalAlpha = p.life;
       ctx.fillStyle = p.color;
@@ -766,17 +773,18 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     }
     ctx.globalAlpha = 1;
 
-    // å©µâ¬é?    for (const l of lasers) {
+    // 激光
+    for (const l of lasers) {
       drawLaser(l.x, l.y, l.w, l.len);
     }
 
-    // éå±¾æº
+    // 敌机
     for (const e of enemies) drawEnemy(e.x, e.y, e.w, e.h);
 
-    // é¬æ³å¿
+    // 道具
     for (const p of powerups) drawPowerup(p);
 
-    // çæ¬è
+    // 子弹
     for (const b of bullets) {
       let color = '#ffd700';
       if (activePowerups.scatter) color = '#ffd700';
@@ -784,7 +792,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
       drawBullet(b.x, b.y, b.w, b.h, color);
     }
 
-    // éâî
+    // 玩家
     drawPlayer(player.x, player.y, player.w, player.h);
 
     ctx.restore();
@@ -792,7 +800,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     animId = requestAnimationFrame(gameLoop);
   }
 
-  // é¹â¬é¹â¬ çï¸½å¸¶ é¹â¬é¹â¬
+  // ── 触控 ──
   function onTouchStart(e) {
     e.preventDefault();
     const t = e.touches[0];
@@ -806,7 +814,8 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     if (!gameRunning) return;
     player.x = touchX;
 
-    // éæ¿îéæ ­ç¶éå ç¬æ¶å¬«æéå ¥æ¸¶çä½ºæ¤é´èæ°¦æµææéµå¶åæµ£è·¨æ¤é?    getAudioCtx();
+    // 初始化音效上下文（需要用户交互后才能使用）
+    getAudioCtx();
   }
 
   function onTouchMove(e) {
@@ -826,7 +835,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     touchActive = false;
   }
 
-  // é¹â¬é¹â¬ æ¦§ç³ç£ é¹â¬é¹â¬
+  // ── 鼠标 ──
   function onMouseDown(e) {
     if (!gameRunning) return;
     touchActive = true;
@@ -856,7 +865,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     touchActive = false;
   }
 
-  // é¹â¬é¹â¬ æµå¬©æ¬¢ç¼æç¾ é¹â¬é¹â¬
+  // ── 事件绑定 ──
   canvas.addEventListener('touchstart', onTouchStart, { passive: false });
   canvas.addEventListener('touchmove', onTouchMove, { passive: false });
   canvas.addEventListener('touchend', onTouchEnd, { passive: false });
@@ -885,7 +894,7 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
     canvas.height = H;
   }
 
-  // é¹â¬é¹â¬ éîå§© é¹â¬é¹â¬
+  // ── 启动 ──
   reset();
   animId = requestAnimationFrame(gameLoop);
 })();
